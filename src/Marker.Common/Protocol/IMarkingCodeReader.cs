@@ -1,6 +1,6 @@
 ﻿namespace Marker.Common.Protocol;
 
-public interface IMarkingCodeReader : IDisposable
+public interface IMarkingCodeReader : IAsyncDisposable
 {
     Task<string?> ReadAsync(CancellationToken ct);
 }

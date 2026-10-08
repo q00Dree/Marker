@@ -27,7 +27,7 @@ public class LineMarkingCodeProtocolTests
         }
 
         stream.Position = 0;
-        using var reader = protocol.CreateReader(stream);
+        await using var reader = protocol.CreateReader(stream);
 
         // Assert
         foreach (var code in codes)
