@@ -1,4 +1,4 @@
-﻿namespace GS1Marker.Server.Generation.Abstractions;
+﻿namespace GS1Marker.Server.Generation;
 
 public interface IMarkingCodeGenerator
 {
