@@ -1,9 +1,11 @@
 <Solution>
   <Folder Name="/Solution Items/">
+    <File Path="../.github/workflows/ci.yml" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
   </Folder>
   <Project Path="GS1Marker.Client/GS1Marker.Client.csproj" />
   <Project Path="GS1Marker.Common/GS1Marker.Common.csproj" />
   <Project Path="GS1Marker.Server/GS1Marker.Server.csproj" />
+  <Project Path="GS1Marker.Tests/GS1Marker.Tests.csproj" />
 </Solution>
