@@ -1,5 +1,0 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="..\GS1Marker.Common\GS1Marker.Common.csproj" />
-  </ItemGroup>
-</Project>
