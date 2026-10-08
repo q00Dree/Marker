@@ -10,11 +10,17 @@ public class LineMarkingCodeProtocolTests
     [Fact]
     public async Task CreatedWriterAndReader_RoundTrip_ReturnSameCodes()
     {
-        var codes = new[] { "0104601234567893215AbCdEfGhIjK", "0100000000000000210000000000A" };
+        // Arrange
+        var codes = new[] 
+        { 
+            "0104601234567893215AbCdEfGhIjK", 
+            "0100000000000000210000000000A" 
+        };
         var protocol = new LineMarkingCodeProtocol();
         using var stream = new MemoryStream();
 
-        using (var writer = protocol.CreateWriter(stream))
+        // Act
+        await using (var writer = protocol.CreateWriter(stream))
         {
             foreach (var code in codes)
                 await writer.WriteAsync(code, Ct);
@@ -23,6 +29,7 @@ public class LineMarkingCodeProtocolTests
         stream.Position = 0;
         using var reader = protocol.CreateReader(stream);
 
+        // Assert
         foreach (var code in codes)
             Assert.Equal(code, await reader.ReadAsync(Ct));
 
@@ -30,10 +37,28 @@ public class LineMarkingCodeProtocolTests
     }
 
     [Fact]
-    public void CreateReader_ReturnsReader() =>
-        Assert.NotNull(new LineMarkingCodeProtocol().CreateReader(new MemoryStream()));
+    public void CreateReader_ReturnsReader()
+    {
+        // Arrange
+        var protocol = new LineMarkingCodeProtocol();
+
+        // Act
+        var reader = protocol.CreateReader(new MemoryStream());
+
+        // Assert
+        Assert.NotNull(reader);
+    }
 
     [Fact]
-    public void CreateWriter_ReturnsWriter() =>
-        Assert.NotNull(new LineMarkingCodeProtocol().CreateWriter(new MemoryStream()));
+    public void CreateWriter_ReturnsWriter()
+    {
+        // Arrange
+        var protocol = new LineMarkingCodeProtocol();
+
+        // Act
+        var writer = protocol.CreateWriter(new MemoryStream());
+
+        // Assert
+        Assert.NotNull(writer);
+    }
 }

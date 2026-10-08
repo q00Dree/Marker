@@ -22,5 +22,5 @@ public sealed class LineMarkingCodeWriter : IMarkingCodeWriter
         await _writer.FlushAsync(ct);
     }
 
-    public void Dispose() => _writer.Dispose();
+    public ValueTask DisposeAsync() => _writer.DisposeAsync();
 }
