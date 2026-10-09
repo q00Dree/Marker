@@ -102,6 +102,65 @@ public class MarkingClientTests
     }
 
     [Fact]
+    public async Task Start_ServerSilent_DisconnectsWithTimeoutAndReconnects()
+    {
+        // Arrange
+        var listener = StartListener();
+        var disconnected = new TaskCompletionSource<Exception?>();
+        await using var client = new MarkingClientBuilder()
+            .Configure(o =>
+            {
+                o.Host = "127.0.0.1";
+                o.Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                ConfigureFast(o);
+                o.IdleTimeout = TimeSpan.FromMilliseconds(100);
+            })
+            .UseLineProtocol()
+            .OnDisconnected(ex => disconnected.TrySetResult(ex))
+            .Build();
+
+        // Act: сервер принимает соединение, но молчит
+        client.Start();
+        using var silentPeer = await listener.AcceptTcpClientAsync().WaitAsync(Timeout);
+
+        // Assert: клиент рвёт соединение по таймауту и подключается снова
+        Assert.IsType<TimeoutException>(await disconnected.Task.WaitAsync(Timeout));
+        using var secondPeer = await listener.AcceptTcpClientAsync().WaitAsync(Timeout);
+        listener.Stop();
+    }
+
+    [Fact]
+    public async Task Start_SlowConsumer_IsNotTreatedAsIdle()
+    {
+        // Arrange
+        var listener = StartListener();
+        var disconnected = false;
+        await using var client = new MarkingClientBuilder()
+            .Configure(o =>
+            {
+                o.Host = "127.0.0.1";
+                o.Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                ConfigureFast(o, bufferCapacity: 1);
+                o.IdleTimeout = TimeSpan.FromMilliseconds(100);
+            })
+            .UseLineProtocol()
+            .OnDisconnected(_ => disconnected = true)
+            .Build();
+
+        // Act: буфер переполнен, клиент ждёт потребителя дольше таймаута
+        client.Start();
+        using var peer = await listener.AcceptTcpClientAsync().WaitAsync(Timeout);
+        await peer.GetStream().WriteAsync("AAA\nBBB\nCCC\n"u8.ToArray());
+        await Task.Delay(300);
+
+        // Assert
+        Assert.False(disconnected);
+        foreach (var expected in new[] { "AAA", "BBB", "CCC" })
+            Assert.Equal(expected, await NextAsync(client));
+        listener.Stop();
+    }
+
+    [Fact]
     public async Task Start_ServerUnavailable_RaisesConnectFailed()
     {
         // Arrange
@@ -201,6 +260,24 @@ public class MarkingClientTests
     {
         // Arrange
         var builder = new MarkingClientBuilder().UseLineProtocol();
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(builder.Build);
+    }
+
+    [Fact]
+    public void Build_NonPositiveIdleTimeout_Throws()
+    {
+        // Arrange
+        var builder = new MarkingClientBuilder()
+            .Configure(o =>
+            {
+                o.Host = "127.0.0.1";
+                o.Port = 5000;
+                ConfigureFast(o);
+                o.IdleTimeout = TimeSpan.Zero;
+            })
+            .UseLineProtocol();
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(builder.Build);

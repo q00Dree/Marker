@@ -1,15 +1,17 @@
-﻿namespace Marker.Common.Protocol.Line;
+namespace Marker.Common.Protocol.Line;
 
 public sealed class LineMarkingCodeReader : IMarkingCodeReader
 {
-    private readonly StreamReader _reader;
+    private readonly Stream _stream;
+    private readonly LineBuffer _buffer;
     private readonly SemaphoreSlim _gate;
 
-    public LineMarkingCodeReader(Stream stream)
+    public LineMarkingCodeReader(Stream stream, int maxLineBytes = LineMarkingCodeFormat.DefaultMaxLineBytes)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        _reader = new StreamReader(stream, LineMarkingCodeFormat.Encoding, false, leaveOpen: true);
+        _stream = stream;
+        _buffer = new LineBuffer(maxLineBytes);
         _gate = new SemaphoreSlim(1, 1);
     }
 
@@ -29,12 +31,7 @@ public sealed class LineMarkingCodeReader : IMarkingCodeReader
 
         try
         {
-            while (true)
-            {
-                var line = await _reader.ReadLineAsync(linked.Token);
-                if (line is null) return null;
-                if (line.Length > 0) return line;
-            }
+            return await ReadLineAsync(linked.Token);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -46,6 +43,25 @@ public sealed class LineMarkingCodeReader : IMarkingCodeReader
         }
     }
 
+    private async Task<string?> ReadLineAsync(CancellationToken ct)
+    {
+        while (true)
+        {
+            if (_buffer.TryTakeLine(out var line)) return line;
+
+            var read = await _stream.ReadAsync(_buffer.GetFreeSpace(), ct);
+            if (read == 0) return EndOfStream();
+
+            _buffer.Advance(read);
+        }
+    }
+
+    private string? EndOfStream() =>
+        _buffer.HasPendingBytes
+            ? throw new InvalidDataException(
+                $"Connection closed in the middle of a message ({_buffer.PendingBytes} bytes without delimiter).")
+            : null;
+
     #region Disposable
     private readonly CancellationTokenSource _disposing = new();
     private int _disposed;
@@ -56,14 +72,7 @@ public sealed class LineMarkingCodeReader : IMarkingCodeReader
 
         await _disposing.CancelAsync();
         await _gate.WaitAsync();
-        try
-        {
-            _reader.Dispose();
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        _gate.Release();
     }
     #endregion
 }

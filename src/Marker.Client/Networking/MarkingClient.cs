@@ -90,7 +90,7 @@ public sealed class MarkingClient : IMarkingClient
         try
         {
             await using var reader = _protocol.CreateReader(client.GetStream());
-            while (await reader.ReadAsync(ct) is { } code)
+            while (await ReadWithIdleTimeoutAsync(reader, ct) is { } code)
                 await _codes.Writer.WriteAsync(code, ct);
         }
         catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
@@ -103,6 +103,24 @@ public sealed class MarkingClient : IMarkingClient
         }
 
         return true;
+    }
+
+    private async Task<string?> ReadWithIdleTimeoutAsync(IMarkingCodeReader reader, CancellationToken ct)
+    {
+        if (_options.IdleTimeout is not { } idleTimeout)
+            return await reader.ReadAsync(ct);
+
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        idle.CancelAfter(idleTimeout);
+
+        try
+        {
+            return await reader.ReadAsync(idle.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new TimeoutException($"No data received from the server for {idleTimeout}.");
+        }
     }
 
     public async ValueTask DisposeAsync()

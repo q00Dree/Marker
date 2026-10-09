@@ -93,15 +93,48 @@ public class LineMarkingCodeReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_LastMessageWithoutDelimiter_IsReturnedBeforeEof()
+    public async Task ReadAsync_LastMessageWithoutDelimiter_ThrowsInvalidData()
     {
         // Arrange
         await using var reader = ReaderFor("AAA\nBBB");
 
         // Act & Assert
         Assert.Equal("AAA", await reader.ReadAsync(Ct));
-        Assert.Equal("BBB", await reader.ReadAsync(Ct));
-        Assert.Null(await reader.ReadAsync(Ct));
+        await Assert.ThrowsAsync<InvalidDataException>(() => reader.ReadAsync(Ct));
+    }
+
+    [Fact]
+    public async Task ReadAsync_LineAtLimit_IsAccepted()
+    {
+        // Arrange
+        await using var reader = new LineMarkingCodeReader(
+            new MemoryStream(Encoding.UTF8.GetBytes("ABCDE\r\nFGHIJ\n")), maxLineBytes: 5);
+
+        // Act & Assert
+        Assert.Equal("ABCDE", await reader.ReadAsync(Ct));
+        Assert.Equal("FGHIJ", await reader.ReadAsync(Ct));
+    }
+
+    [Fact]
+    public async Task ReadAsync_LineExceedsLimitWithDelimiter_ThrowsInvalidData()
+    {
+        // Arrange
+        await using var reader = new LineMarkingCodeReader(
+            new MemoryStream(Encoding.UTF8.GetBytes("ABCDEF\n")), maxLineBytes: 5);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidDataException>(() => reader.ReadAsync(Ct));
+    }
+
+    [Fact]
+    public async Task ReadAsync_EndlessDataWithoutDelimiter_ThrowsInvalidData()
+    {
+        // Arrange
+        await using var reader = new LineMarkingCodeReader(
+            new MemoryStream(new byte[100_000]), maxLineBytes: 32);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidDataException>(() => reader.ReadAsync(Ct));
     }
 
     [Fact]

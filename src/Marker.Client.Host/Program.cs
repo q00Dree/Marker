@@ -9,6 +9,7 @@ var builder = new MarkingClientBuilder()
         o.Host = "127.0.0.1";
         o.Port = 5000;
         o.BufferCapacity = 1000;
+        o.IdleTimeout = TimeSpan.FromSeconds(10);
         o.Resilience.InitialDelay = TimeSpan.FromSeconds(1);
         o.Resilience.MaxDelay = TimeSpan.FromSeconds(30);
         o.Resilience.Multiplier = 2;

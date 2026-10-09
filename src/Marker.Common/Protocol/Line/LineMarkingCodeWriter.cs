@@ -11,7 +11,7 @@ public sealed class LineMarkingCodeWriter : IMarkingCodeWriter
 
         _writer = new StreamWriter(stream, LineMarkingCodeFormat.Encoding, leaveOpen: true)
         {
-            NewLine = LineMarkingCodeFormat.Delimiter
+            NewLine = LineMarkingCodeFormat.Delimiter.ToString()
         };
         _gate = new SemaphoreSlim(1, 1);
     }
