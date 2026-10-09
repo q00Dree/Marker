@@ -1,4 +1,6 @@
 using Marker.Client.Networking;
+using Marker.Common.Protocol;
+using Marker.Common.Protocol.Line;
 using System.Net;
 using System.Net.Sockets;
 using Xunit;
@@ -8,6 +10,9 @@ namespace Marker.Tests.Client;
 public class MarkingClientTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+
+    // Клиент и «сервер» в тестах говорят через один и тот же протокол, формат кадров тестам не известен.
+    private static readonly IMarkingCodeProtocol Protocol = new LineMarkingCodeProtocol();
 
     private static void ConfigureFast(MarkingClientOptions o, int bufferCapacity = 16)
     {
@@ -32,12 +37,20 @@ public class MarkingClientTests
                 o.Port = ((IPEndPoint)listener.LocalEndpoint).Port;
                 ConfigureFast(o, bufferCapacity);
             })
-            .UseLineProtocol();
+            .UseProtocol(Protocol);
 
-    private static async Task SendAndCloseAsync(TcpListener listener, string text)
+    /// <summary>Принимает одно подключение, отправляет коды через протокол клиента и закрывает соединение.</summary>
+    private static async Task SendAndCloseAsync(TcpListener listener, params string[] codes)
     {
         using var peer = await listener.AcceptTcpClientAsync();
-        await peer.GetStream().WriteAsync(System.Text.Encoding.UTF8.GetBytes(text));
+        await SendAsync(peer, codes);
+    }
+
+    private static async Task SendAsync(TcpClient peer, params string[] codes)
+    {
+        await using var writer = Protocol.CreateWriter(peer.GetStream());
+        foreach (var code in codes)
+            await writer.WriteAsync(code, CancellationToken.None);
     }
 
     private static Task<string> NextAsync(IMarkingClient client) =>
@@ -52,7 +65,7 @@ public class MarkingClientTests
 
         // Act
         client.Start();
-        await SendAndCloseAsync(listener, "AAA\nBBB\n").WaitAsync(Timeout);
+        await SendAndCloseAsync(listener, "AAA", "BBB").WaitAsync(Timeout);
 
         // Assert
         Assert.Equal("AAA", await NextAsync(client));
@@ -72,9 +85,9 @@ public class MarkingClientTests
 
         // Act
         client.Start();
-        await SendAndCloseAsync(listener, "AAA\n").WaitAsync(Timeout);
+        await SendAndCloseAsync(listener, "AAA").WaitAsync(Timeout);
         await disconnected.Task.WaitAsync(Timeout);
-        await SendAndCloseAsync(listener, "BBB\n").WaitAsync(Timeout);
+        await SendAndCloseAsync(listener, "BBB").WaitAsync(Timeout);
 
         // Assert
         Assert.Equal("AAA", await NextAsync(client));
@@ -91,7 +104,7 @@ public class MarkingClientTests
 
         // Act
         client.Start();
-        await SendAndCloseAsync(listener, "AAA\nBBB\nCCC\nDDD\n").WaitAsync(Timeout);
+        await SendAndCloseAsync(listener, "AAA", "BBB", "CCC", "DDD").WaitAsync(Timeout);
         await Task.Delay(100);
 
         // Assert
@@ -114,7 +127,7 @@ public class MarkingClientTests
                 ConfigureFast(o);
                 o.IdleTimeout = TimeSpan.FromMilliseconds(100);
             })
-            .UseLineProtocol()
+            .UseProtocol(Protocol)
             .OnDisconnected(ex => disconnected.TrySetResult(ex))
             .Build();
 
@@ -142,14 +155,14 @@ public class MarkingClientTests
                 ConfigureFast(o, bufferCapacity: 1);
                 o.IdleTimeout = TimeSpan.FromMilliseconds(100);
             })
-            .UseLineProtocol()
+            .UseProtocol(Protocol)
             .OnDisconnected(_ => disconnected = true)
             .Build();
 
         // Act: буфер переполнен, клиент ждёт потребителя дольше таймаута
         client.Start();
         using var peer = await listener.AcceptTcpClientAsync().WaitAsync(Timeout);
-        await peer.GetStream().WriteAsync("AAA\nBBB\nCCC\n"u8.ToArray());
+        await SendAsync(peer, "AAA", "BBB", "CCC");
         await Task.Delay(300);
 
         // Assert
@@ -175,7 +188,7 @@ public class MarkingClientTests
                 o.Port = port;
                 ConfigureFast(o);
             })
-            .UseLineProtocol()
+            .UseProtocol(Protocol)
             .OnConnectFailed(ex => failed.TrySetResult(ex))
             .Build();
 
@@ -204,7 +217,7 @@ public class MarkingClientTests
                 ConfigureFast(o);
                 o.Resilience.MaxAttempts = 0;
             })
-            .UseLineProtocol()
+            .UseProtocol(Protocol)
             .OnConnectFailed(_ => Interlocked.Increment(ref failures))
             .OnRetriesExhausted(() => exhausted.TrySetResult())
             .Build();
@@ -246,7 +259,7 @@ public class MarkingClientTests
         var listener = StartListener();
         var client = ClientFor(listener, bufferCapacity: 1).Build();
         client.Start();
-        await SendAndCloseAsync(listener, "AAA\nBBB\nCCC\n").WaitAsync(Timeout);
+        await SendAndCloseAsync(listener, "AAA", "BBB", "CCC").WaitAsync(Timeout);
         await Task.Delay(100);
 
         // Act & Assert
@@ -258,7 +271,7 @@ public class MarkingClientTests
     public void Build_WithoutHost_Throws()
     {
         // Arrange
-        var builder = new MarkingClientBuilder().UseLineProtocol();
+        var builder = new MarkingClientBuilder().UseProtocol(Protocol);
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(builder.Build);
@@ -276,7 +289,7 @@ public class MarkingClientTests
                 ConfigureFast(o);
                 o.IdleTimeout = TimeSpan.Zero;
             })
-            .UseLineProtocol();
+            .UseProtocol(Protocol);
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(builder.Build);
@@ -293,7 +306,7 @@ public class MarkingClientTests
                 o.Port = 5000;
                 ConfigureFast(o, bufferCapacity: 0);
             })
-            .UseLineProtocol();
+            .UseProtocol(Protocol);
 
         // Act & Assert
         Assert.Throws<InvalidOperationException>(builder.Build);
