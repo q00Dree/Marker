@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Marker.Client\Marker.Client.csproj" />
     <ProjectReference Include="..\Marker.Server\Marker.Server.csproj" />
   </ItemGroup>
 

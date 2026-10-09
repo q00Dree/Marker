@@ -104,5 +104,7 @@ public sealed class MarkingServer : IMarkingServer
         await _acceptLoop;
         await Task.WhenAll(_connections.Keys);
         _shutdown.Dispose();
+
+        ConnectionFaulted = null;
     }
 }
