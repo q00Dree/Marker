@@ -1,4 +1,5 @@
 using Marker.Common.Protocol;
+using Microsoft.Extensions.Options;
 using System.Net.Sockets;
 using System.Threading.Channels;
 
@@ -21,11 +22,17 @@ public sealed class MarkingClient : IMarkingClient
     private Task _reconnectLoop = Task.CompletedTask;
     private int _started;
 
-    internal MarkingClient(MarkingClientOptions options, IMarkingCodeProtocol protocol)
+    /// <exception cref="InvalidOperationException">Опции заданы некорректно.</exception>
+    public MarkingClient(IOptions<MarkingClientOptions> options, IMarkingCodeProtocol protocol)
     {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(protocol);
+
+        _options = options.Value;
+        _options.Validate();
+
         _protocol = protocol;
-        _options = options;
-        _codes = Channel.CreateBounded<string>(new BoundedChannelOptions(options.BufferCapacity)
+        _codes = Channel.CreateBounded<string>(new BoundedChannelOptions(_options.BufferCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleWriter = true

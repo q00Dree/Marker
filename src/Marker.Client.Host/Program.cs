@@ -1,39 +1,27 @@
+using Marker.Client.Host;
 using Marker.Client.Networking;
 using Marker.Client.Output;
+using Marker.Common.Protocol;
+using Marker.Common.Protocol.Line;
+using Microsoft.Extensions.Options;
 
-await using var output = new FileMarkingCodeOutput("codes.txt");
-
-var builder = new MarkingClientBuilder()
-    .Configure(o =>
-    {
-        o.Host = "127.0.0.1";
-        o.Port = 5000;
-        o.BufferCapacity = 1000;
-        o.IdleTimeout = TimeSpan.FromSeconds(10);
-        o.Resilience.InitialDelay = TimeSpan.FromSeconds(1);
-        o.Resilience.MaxDelay = TimeSpan.FromSeconds(30);
-        o.Resilience.Multiplier = 2;
-        o.Resilience.MaxAttempts = null;
-    })
-    .UseLineProtocol()
-    .OnConnected(() => Console.WriteLine("Connected."))
-    .OnDisconnected(ex => Console.WriteLine(ex is null ? "Disconnected." : $"Disconnected: {ex.Message}"))
-    .OnRetriesExhausted(() => Console.Error.WriteLine("Retries exhausted."))
-    .OnConnectFailed(ex => Console.Error.WriteLine($"Connect failed: {ex.Message}"));
-
-using var shutdown = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) =>
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
-    e.Cancel = true;
-    shutdown.Cancel();
-};
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
 
-await using var client = builder.Build();
-client.Start();
+builder.Services.Configure<MarkingClientOptions>(builder.Configuration.GetSection("Client"));
+builder.Services.Configure<OutputOptions>(builder.Configuration.GetSection("Output"));
 
-try
+builder.Services.AddSingleton<IMarkingCodeProtocol, LineMarkingCodeProtocol>();
+builder.Services.AddSingleton<IMarkingClient, MarkingClient>();
+builder.Services.AddSingleton(sp =>
 {
-    await foreach (var code in client.Codes.ReadAllAsync(shutdown.Token))
-        await output.WriteAsync(code, shutdown.Token);
-}
-catch (OperationCanceledException) { }
+    var path = sp.GetRequiredService<IOptions<OutputOptions>>().Value.Path;
+    return new FileMarkingCodeOutput(path ?? throw new InvalidOperationException("Output:Path is not set."));
+});
+
+builder.Services.AddHostedService<MarkingClientService>();
+
+await builder.Build().RunAsync();

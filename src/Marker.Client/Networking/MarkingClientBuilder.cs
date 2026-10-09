@@ -1,5 +1,6 @@
 using Marker.Common.Protocol;
 using Marker.Common.Protocol.Line;
+using Microsoft.Extensions.Options;
 
 namespace Marker.Client.Networking;
 
@@ -66,9 +67,8 @@ public sealed class MarkingClientBuilder
     {
         if (_protocol is null)
             throw new InvalidOperationException("Protocol is not set. Call UseProtocol().");
-        _options.Validate();
 
-        var client = new MarkingClient(_options, _protocol);
+        var client = new MarkingClient(Options.Create(_options), _protocol);
         if (_onConnected is not null) client.Connected += _onConnected;
         if (_onDisconnected is not null) client.Disconnected += _onDisconnected;
         if (_onConnectFailed is not null) client.ConnectFailed += _onConnectFailed;

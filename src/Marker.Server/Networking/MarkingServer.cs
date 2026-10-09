@@ -1,5 +1,6 @@
 using Marker.Common.Protocol;
 using Marker.Server.Generation;
+using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 
@@ -19,11 +20,15 @@ public sealed class MarkingServer : IMarkingServer
     private Task _acceptLoop = Task.CompletedTask;
     private int _started;
 
-    internal MarkingServer(MarkingServerOptions options, IMarkingCodeProtocol protocol, IMarkingCodeGenerator generator)
+    public MarkingServer(IOptions<MarkingServerOptions> options, IMarkingCodeProtocol protocol, IMarkingCodeGenerator generator)
     {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(protocol);
+        ArgumentNullException.ThrowIfNull(generator);
+
         _protocol = protocol;
         _generator = generator;
-        _options = options;
+        _options = options.Value;
 
         _listener = new TcpListener(_options.ToEndPoint());
         _shutdown = new CancellationTokenSource();

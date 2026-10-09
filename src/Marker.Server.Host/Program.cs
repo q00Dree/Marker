@@ -1,29 +1,28 @@
+using Marker.Common.Protocol;
+using Marker.Common.Protocol.Line;
+using Marker.Server.Generation;
+using Marker.Server.Generation.Gs1;
+using Marker.Server.Host;
 using Marker.Server.Networking;
 using System.Net;
 
-var builder = new MarkingServerBuilder()
-    .Configure(o =>
-    {
-        o.Address = IPAddress.Any;
-        o.Port = 5000;
-        o.GenerationDelay = TimeSpan.FromMilliseconds(500);
-    })
-    .UseLineProtocol()
-    .UseGs1Generator()
-    .OnConnectionFaulted(ex => Console.Error.WriteLine($"Connection faulted: {ex}"));
-
-using var shutdown = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) =>
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
-    e.Cancel = true;
-    shutdown.Cancel();
-};
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
 
-await using var server = builder.Build();
-server.Start();
+var serverSection = builder.Configuration.GetSection("Server");
+builder.Services.AddOptions<MarkingServerOptions>()
+    .Bind(serverSection)
+    .Configure(o => o.Address = IPAddress.TryParse(serverSection["Address"], out var address)
+        ? address
+        : throw new InvalidOperationException("Server:Address is missing or is not a valid IP address."));
 
-try
-{
-    await Task.Delay(Timeout.Infinite, shutdown.Token);
-}
-catch (OperationCanceledException) { }
+builder.Services.AddSingleton<IMarkingCodeProtocol, LineMarkingCodeProtocol>();
+builder.Services.AddSingleton<IMarkingCodeGenerator>(_ => new Gs1MarkingCodeGenerator());
+builder.Services.AddSingleton<IMarkingServer, MarkingServer>();
+
+builder.Services.AddHostedService<MarkingServerService>();
+
+await builder.Build().RunAsync();

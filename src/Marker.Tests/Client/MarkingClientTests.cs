@@ -1,7 +1,6 @@
 using Marker.Client.Networking;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading.Channels;
 using Xunit;
 
 namespace Marker.Tests.Client;

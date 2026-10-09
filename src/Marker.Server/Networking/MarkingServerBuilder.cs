@@ -2,6 +2,7 @@ using Marker.Common.Protocol;
 using Marker.Common.Protocol.Line;
 using Marker.Server.Generation;
 using Marker.Server.Generation.Gs1;
+using Microsoft.Extensions.Options;
 
 namespace Marker.Server.Networking;
 
@@ -56,7 +57,7 @@ public sealed class MarkingServerBuilder
         if (_generator is null)
             throw new InvalidOperationException("Generator is not set. Call UseGenerator().");
 
-        var server = new MarkingServer(_options, _protocol, _generator);
+        var server = new MarkingServer(Options.Create(_options), _protocol, _generator);
         if (_onConnectionFaulted is not null)
             server.ConnectionFaulted += _onConnectionFaulted;
 

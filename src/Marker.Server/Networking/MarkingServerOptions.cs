@@ -4,7 +4,7 @@ namespace Marker.Server.Networking;
 
 public sealed class MarkingServerOptions
 {
-    public IPAddress? Address { get; set; }
+    public IPAddress Address { get; set; } = null!;
     public int Port { get; set; }
     public TimeSpan GenerationDelay { get; set; }
 
