@@ -16,7 +16,7 @@ public sealed class LineMarkingCodeReader : IMarkingCodeReader
     public async Task<string?> ReadAsync(CancellationToken ct)
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) == 1, this);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposing.Token);
 
         try
         {
@@ -47,14 +47,14 @@ public sealed class LineMarkingCodeReader : IMarkingCodeReader
     }
 
     #region Disposable
-    private readonly CancellationTokenSource _disposeCts = new();
+    private readonly CancellationTokenSource _disposing = new();
     private int _disposed;
 
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
 
-        await _disposeCts.CancelAsync();
+        await _disposing.CancelAsync();
         await _gate.WaitAsync();
         try
         {
