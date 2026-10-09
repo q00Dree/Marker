@@ -7,5 +7,6 @@
   <Project Path="Marker.Client/Marker.Client.csproj" />
   <Project Path="Marker.Common/Marker.Common.csproj" />
   <Project Path="Marker.Server/Marker.Server.csproj" />
+  <Project Path="Marker.Server.Host/Marker.Server.Host.csproj" />
   <Project Path="Marker.Tests/Marker.Tests.csproj" />
 </Solution>
